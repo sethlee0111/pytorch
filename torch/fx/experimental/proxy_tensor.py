@@ -264,6 +264,7 @@ def proxy_call(proxy_mode, func, pre_dispatch, args, kwargs):
     # TODO: we could use types to test this
     if not pytree.tree_all_only(torch.Tensor, can_handle_tensor, (args, kwargs)):
         not_implemented_log.debug("ProxyTensorMode tensors without proxy had unrecognized subclasses: %s", unrecognized_types)
+        import pdb; pdb.set_trace()
         return NotImplemented
 
     if func in CURRENT_DECOMPOSITION_TABLE:
@@ -550,6 +551,8 @@ class ProxyTorchDispatchMode(TorchDispatchMode):
 
     @count
     def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+        if 'clone' in str(func):
+            print("FUNC: " + str(func))
         with self.sym_mode.enable(False), set_original_aten_op(func):
             return self.inner_torch_dispatch(func, types, args, kwargs)
 
@@ -828,11 +831,12 @@ def get_innermost_proxy_mode():
 def disable_proxy_modes_tracing():
     # Only one proxy_mode can be "active" at a time.
     # So we simply remove our active mode.
-    old = _unset_proxy_tensor_mode()
+    maybe_old = None if torch._C._get_proxy_tensor_mode() is None else torch._C._unset_proxy_tensor_mode()
     try:
         yield
     finally:
-        _set_proxy_tensor_mode(old)
+        if maybe_old is not None:
+            _set_proxy_tensor_mode(maybe_old)
 
 
 def get_isolated_graphmodule(func, args, kwargs, tracing_mode="real"):
