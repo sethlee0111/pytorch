@@ -12,8 +12,8 @@ from .quantizer import (
     Quantizer,
     QuantizationAnnotation,
 )
-from torch.ao.quantization._pt2e.graph_utils import find_sequential_partitions
-from torch.ao.quantization._pt2e.quantizer.utils import (
+from torch.ao.quantization.pt2e.graph_utils import find_sequential_partitions
+from torch.ao.quantization.pt2e.quantizer.utils import (
     get_input_act_qspec,
     get_output_act_qspec,
     get_weight_qspec,
