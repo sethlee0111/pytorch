@@ -2,6 +2,8 @@ import logging
 import operator
 import os
 import re
+import copy
+import dataclasses
 import sys
 import time
 from contextlib import contextmanager
@@ -97,6 +99,12 @@ def is_magic_method(op):
     magic_ops = {method_to_operator(m) for m in magic_methods}
     return op in magic_ops
 
+@dataclasses.dataclass
+class GraphState:
+    removed_buffers: Set[str]
+    wrapper_allocated: Set[str]
+    wrapper_freed: Set[str]
+    wrapper_num_lines: int
 
 class GraphLowering(torch.fx.Interpreter):
     def symbolic_sizes_strides(self, ex: torch.Tensor):
@@ -206,6 +214,32 @@ class GraphLowering(torch.fx.Interpreter):
         ] = (
             []
         )  # This is the linemap used by the profiler to mark custom compiled kernels getting run
+        self.saved_state = []
+
+    def save_state(self):
+        try:
+            self.saved_state.append(GraphState(
+                removed_buffers=copy.deepcopy(self.removed_buffers),
+                wrapper_allocated=copy.deepcopy(self.wrapper_code.allocated),
+                wrapper_freed=copy.deepcopy(self.wrapper_code.freed),
+                wrapper_num_lines=len(self.wrapper_code.lines),
+            ))
+        except:
+            breakpoint() # TODO
+            raise
+
+    def restore_state(self):
+        state = self.saved_state[-1]
+        self.removed_buffers = state.removed_buffers
+        self.wrapper_code.allocated = state.wrapper_allocated
+        self.wrapper_code.freed = state.wrapper_freed
+        assert len(self.wrapper_code.lines) >= state.wrapper_num_lines
+        self.wrapper_code.lines = self.wrapper_code.lines[:state.wrapper_num_lines]
+        self.drop_state()
+
+    def drop_state(self):
+        self.saved_state.pop()
+
 
     @staticmethod
     def decide_layout_opt(gm) -> bool:
