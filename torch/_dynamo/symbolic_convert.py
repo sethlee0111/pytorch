@@ -602,13 +602,18 @@ class InstructionTranslatorBase(Checkpointable[InstructionTranslatorGraphState])
             self.restore_graphstate(state)
             raise
 
-    def log_starts_line(self):
-        if not torch._logging._internal.log_state.is_artifact_enabled("trace_source"):
-            return
+    def get_line_of_code_header(self, lineno=None):
+        if lineno is None:
+            lineno = self.lineno
         inline_depth_str = (
             f" (inline depth: {self.inline_depth})" if self.inline_depth > 0 else ""
         )
-        log_str = f"TRACE starts_line {self.f_code.co_name} {self.f_code.co_filename}:{self.lineno}{inline_depth_str}\n"
+        return f"{self.f_code.co_name} {self.f_code.co_filename}:{lineno}{inline_depth_str}"
+
+    def log_starts_line(self):
+        if not torch._logging._internal.log_state.is_artifact_enabled("trace_source"):
+            return
+        log_str = f"TRACE starts_line {self.get_line_of_code_header()}\n"
         line = linecache.getline(self.f_code.co_filename, self.lineno).rstrip()
         log_str += f"    {line}"
         trace_source_log.debug(log_str)
